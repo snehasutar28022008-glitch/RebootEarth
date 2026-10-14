@@ -205,3 +205,46 @@ export interface OrderItem {
   estimated_value_max: number;
   created_at: string;
 }
+
+export type ComponentStatus = 'Available' | 'Under Testing' | 'Not Available';
+
+export interface Component {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  status: ComponentStatus;
+  is_demo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  tools_required: string;
+  is_demo: boolean;
+  created_at: string;
+}
+
+export interface ProjectComponent {
+  id: string;
+  project_id: string;
+  component_name: string;
+  required_quantity: number | null;
+  note: string;
+  created_at: string;
+}
+
+export type ComponentRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface ComponentRequest {
+  id: string;
+  user_id: string;
+  component_id: string;
+  quantity: number;
+  purpose: string;
+  status: ComponentRequestStatus;
+  created_at: string;
+}

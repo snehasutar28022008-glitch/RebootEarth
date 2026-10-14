@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from '@/context/RouterContext';
 import { useAuth } from '@/context/AuthContext';
 import { useBasket } from '@/context/BasketContext';
-import { Recycle, Menu, X, LayoutDashboard, LogOut, User, Shield, Home, Phone, Info, HelpCircle, ListChecks, IndianRupee, ShoppingCart } from 'lucide-react';
+import { Recycle, Menu, X, LayoutDashboard, LogOut, User, Shield, Home, Phone, Info, HelpCircle, ListChecks, IndianRupee, ShoppingCart, Cpu, ClipboardList, Lightbulb } from 'lucide-react';
 
 export function Navbar() {
   const { path, navigate } = useRouter();
@@ -21,6 +21,9 @@ export function Navbar() {
 
   const userLinks = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Components', href: '/components', icon: Cpu },
+    { label: 'My Requests', href: '/my-requests', icon: ClipboardList },
+    { label: 'Mini Projects', href: '/projects', icon: Lightbulb },
   ];
 
   const adminLinks = [

@@ -26,7 +26,12 @@ import { AdminHandover } from '@/pages/admin/AdminHandover';
 import { AdminUsers } from '@/pages/admin/AdminUsers';
 import { AdminZones } from '@/pages/admin/AdminZones';
 import { AdminOrders } from '@/pages/admin/AdminOrders';
+import { AdminComponents } from '@/pages/admin/AdminComponents';
+import { AdminComponentRequests } from '@/pages/admin/AdminComponentRequests';
 import { AddItemsPage } from '@/pages/AddItemsPage';
+import { ComponentsPage } from '@/pages/ComponentsPage';
+import { MyRequestsPage } from '@/pages/MyRequestsPage';
+import { MiniProjectsPage } from '@/pages/MiniProjectsPage';
 
 function AppRoutes() {
   const { path } = useRouter();
@@ -69,6 +74,11 @@ function AppRoutes() {
     if (path === '/admin/users') return <AdminUsers />;
     if (path === '/admin/zones') return <AdminZones />;
     if (path === '/admin/orders') return <AdminOrders />;
+    if (path === '/admin/components') return <AdminComponents />;
+    if (path === '/admin/component-requests') return <AdminComponentRequests />;
+    if (path === '/components') return <ComponentsPage />;
+    if (path === '/my-requests') return <MyRequestsPage />;
+    if (path === '/projects') return <MiniProjectsPage />;
     if (path.startsWith('/admin')) return <AdminPage />;
     return <HomePage />;
   };
