@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { AcceptedItem, Setting } from '@/lib/supabase';
 import { PageHeader } from '@/components/ui';
-import { CheckCircle, AlertTriangle, XCircle, ListChecks, Info } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, ListChecks, Info, Camera } from 'lucide-react';
 
 export function AcceptPage() {
   const [items, setItems] = useState<AcceptedItem[]>([]);
@@ -28,7 +28,7 @@ export function AcceptPage() {
   }, []);
 
   const accepted = items.filter((i) => i.type === 'accepted');
-  const special = items.filter((i) => i.type === 'special');
+  const specialRequest = items.filter((i) => i.type === 'special_request');
   const notAccepted = items.filter((i) => i.type === 'not_accepted');
 
   if (loading) {
@@ -45,7 +45,7 @@ export function AcceptPage() {
     <div className="container-max section-padding animate-fade-in">
       <PageHeader
         title="What We Accept"
-        subtitle="We collect a wide range of small electronic waste. The final list depends on our recycling partner's rules."
+        subtitle="We collect a wide range of small electronic waste. Final approval is given by our partner company."
         icon={ListChecks}
       />
 
@@ -69,17 +69,20 @@ export function AcceptPage() {
         </div>
 
         <div className="space-y-6">
-          {/* Special handling */}
+          {/* Special Request */}
           <div className="card border-2 border-amber-light/40">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-light/30">
                 <AlertTriangle className="h-6 w-6 text-amber-dark" />
               </div>
-              <h2 className="font-display text-xl font-bold text-forest-800">Special Handling</h2>
+              <h2 className="font-display text-xl font-bold text-forest-800">Special Request</h2>
             </div>
-            <p className="text-xs text-amber-dark mb-3">Accepted only with a hazard flag</p>
+            <div className="mb-3 flex items-start gap-2 rounded-xl bg-amber-light/10 px-3 py-2">
+              <Camera className="h-4 w-4 text-amber-dark flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-dark">Photo is sent for partner company approval.</p>
+            </div>
             <ul className="space-y-2">
-              {special.map((item) => (
+              {specialRequest.map((item) => (
                 <li key={item.id} className="flex items-start gap-3 rounded-xl bg-amber-light/10 px-3 py-2.5">
                   <AlertTriangle className="h-5 w-5 text-amber-dark flex-shrink-0 mt-0.5" />
                   <span className="text-sm text-forest-700">{item.name}</span>
@@ -112,13 +115,13 @@ export function AcceptPage() {
       <div className="mt-8 space-y-4">
         <div className="flex items-start gap-3 rounded-2xl bg-forest-50 p-4">
           <Info className="h-5 w-5 text-forest-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-forest-700">{settings['accepted_list_note'] || 'The final list depends on our recycling partner\'s rules.'}</p>
+          <p className="text-sm text-forest-700">{settings['accepted_list_note'] || 'Final approval is given by our partner company.'}</p>
         </div>
         {settings['min_quantity'] && (
           <div className="flex items-start gap-3 rounded-2xl bg-mint/30 p-4">
             <Info className="h-5 w-5 text-forest-500 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-forest-700">
-              Minimum {settings['min_quantity']} items per pickup. You can mix different categories in one pickup.
+              Minimum {settings['min_quantity']} accepted items per pickup. Special Request items do not count towards the minimum.
             </p>
           </div>
         )}

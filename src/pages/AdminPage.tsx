@@ -3,11 +3,12 @@ import { useAuth } from '@/context/AuthContext';
 import { PageHeader } from '@/components/ui';
 import {
   Shield, LayoutDashboard, Truck, ClipboardCheck, IndianRupee,
-  Boxes, Users, MapPin, ArrowLeft,
+  Boxes, Users, MapPin, ArrowLeft, ClipboardList,
 } from 'lucide-react';
 
 const ADMIN_SECTIONS = [
   { label: 'Overview', desc: 'Dashboard stats and recent activity', href: '/admin/overview', icon: LayoutDashboard },
+  { label: 'Orders', desc: 'Approve orders, assign companies, award points', href: '/admin/orders', icon: ClipboardList },
   { label: 'Pickup Requests', desc: 'View and manage incoming pickup requests', href: '/admin/pickups', icon: Truck },
   { label: 'Inspection & Grading', desc: 'Grade collected items and confirm values', href: '/admin/grading', icon: ClipboardCheck },
   { label: 'Rate Table', desc: 'Edit pricing for each category and grade', href: '/admin/rates', icon: IndianRupee },

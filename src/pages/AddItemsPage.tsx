@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useBasket, type BasketItem } from '@/context/BasketContext';
 import { supabase } from '@/lib/supabase';
-import type { Rate, GradeFactor, AcceptedItem, Setting } from '@/lib/supabase';
+import type { Rate, GradeFactor, AcceptedItem, Setting, Order } from '@/lib/supabase';
 import {
   CATEGORY_MAPPINGS,
   DATA_WIPE_CATEGORIES,
@@ -14,6 +14,7 @@ import {
   estimateValue,
   getAcceptedLabels,
   getCategoryMapping,
+  isItemAccepted,
   type CategoryMapping,
 } from '@/lib/itemUtils';
 import { PageHeader, LoadingSpinner, EmptyState } from '@/components/ui';
@@ -79,12 +80,15 @@ export function AddItemsPage() {
 
   const minQty = parseInt(settings['min_quantity'] || '3', 10);
 
+  const [showCheckout, setShowCheckout] = useState(false);
+
   const handleProceedToBook = () => {
-    if (totalItems < minQty) {
-      showToast(`Minimum ${minQty} items per pickup. You have ${totalItems}.`, 'warning');
+    const acceptedCount = items.filter((i) => i.source !== 'manual' || true).reduce((sum, i) => sum + i.quantity, 0);
+    if (acceptedCount < minQty) {
+      showToast(`Minimum ${minQty} accepted items per pickup. You have ${acceptedCount}.`, 'warning');
       return;
     }
-    navigate('/book');
+    setShowCheckout(true);
   };
 
   if (loading) {
@@ -161,8 +165,25 @@ export function AddItemsPage() {
         />
       )}
 
+      {/* Checkout form */}
+      {showCheckout && (
+        <CheckoutForm
+          items={items}
+          totalItems={totalItems}
+          totalValueMin={totalValueMin}
+          totalValueMax={totalValueMax}
+          hasHazardous={hasHazardous}
+          onCancel={() => setShowCheckout(false)}
+          onSuccess={() => {
+            clearBasket();
+            setShowCheckout(false);
+            navigate('/dashboard');
+          }}
+        />
+      )}
+
       {/* Pickup Basket */}
-      {items.length > 0 && (
+      {items.length > 0 && !showCheckout && (
         <div className="mt-8">
           <PickupBasket
             items={items}
@@ -289,6 +310,7 @@ function ModeOneByOne({
             {acceptedLabels.map((label) => {
               const Icon = CATEGORY_ICONS[label] || Package;
               const isSelected = selectedLabel === label;
+              const itemType = isItemAccepted(label, acceptedItems);
               return (
                 <button
                   key={label}
@@ -304,7 +326,10 @@ function ModeOneByOne({
                   }`}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0 text-forest-500" />
-                  <span className="line-clamp-2">{label}</span>
+                  <div className="min-w-0">
+                    <span className="line-clamp-2 block">{label}</span>
+                    <ItemTypeBadge type={itemType} />
+                  </div>
                 </button>
               );
             })}
@@ -481,7 +506,7 @@ function ModeGroupPhoto({
             {/* Manual item picker */}
             <div>
               <p className="mb-2 text-sm font-medium text-forest-700">Select your items:</p>
-              <GroupItemPicker acceptedLabels={acceptedLabels} onAdd={handleAddManualItem} />
+              <GroupItemPicker acceptedLabels={acceptedLabels} acceptedItems={acceptedItems} onAdd={handleAddManualItem} />
             </div>
           </div>
         )}
@@ -505,13 +530,17 @@ function ModeGroupPhoto({
 // ============================================================
 function GroupItemPicker({
   acceptedLabels,
+  acceptedItems,
   onAdd,
 }: {
   acceptedLabels: string[];
+  acceptedItems: AcceptedItem[];
   onAdd: (label: string, quantity: number) => void;
 }) {
   const [selectedLabel, setSelectedLabel] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
+
+  const selectedItemType = selectedLabel ? isItemAccepted(selectedLabel, acceptedItems) : 'unknown';
 
   return (
     <div className="space-y-3">
@@ -557,6 +586,7 @@ function GroupItemPicker({
           <Plus className="h-4 w-4" /> Add
         </button>
       </div>
+      {selectedLabel && <ItemTypeBadge type={selectedItemType} />}
     </div>
   );
 }
@@ -759,19 +789,16 @@ function PhotoUpload({
   const handleFile = async (file: File) => {
     if (!user) return;
     setUploading(true);
-    const fileName = `${user.id}/${crypto.randomUUID()}.jpg`;
-    const { error } = await supabase.storage.from('item-photos').upload(fileName, file, { contentType: file.type });
+    const fileName = `${user.id}/${crypto.randomUUID()}.${file.name.split('.').pop() || 'jpg'}`;
+    const { error: uploadError } = await supabase.storage.from('item-photos').upload(fileName, file, { contentType: file.type });
     setUploading(false);
-    if (error) {
-      // If storage bucket doesn't exist yet, use a local URL as fallback
-      const localUrl = URL.createObjectURL(file);
-      onUpload(localUrl);
-      showToast('Photo saved locally (storage will be configured later)', 'info');
-    } else {
-      const { data } = supabase.storage.from('item-photos').getPublicUrl(fileName);
-      onUpload(data.publicUrl);
-      showToast('Photo uploaded', 'success');
+    if (uploadError) {
+      showToast(`Upload failed: ${uploadError.message}`, 'error');
+      return;
     }
+    const { data } = supabase.storage.from('item-photos').getPublicUrl(fileName);
+    onUpload(data.publicUrl);
+    showToast('Photo uploaded', 'success');
   };
 
   return (
@@ -970,7 +997,7 @@ function PickupBasket({
             disabled={totalItems < minQty}
             className="btn-primary flex-1"
           >
-            Proceed to Booking
+            Proceed to Checkout
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -979,6 +1006,242 @@ function PickupBasket({
             Add {minQty - totalItems} more item{minQty - totalItems !== 1 ? 's' : ''} to reach the minimum of {minQty}.
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ITEM TYPE BADGE
+// ============================================================
+function ItemTypeBadge({ type }: { type: 'accepted' | 'special' | 'not_accepted' | 'special_request' | 'unknown' }) {
+  const config = {
+    accepted: { label: 'Accepted', class: 'bg-forest-50 text-forest-600' },
+    special: { label: 'Special Handling', class: 'bg-amber-light/20 text-amber-dark' },
+    special_request: { label: 'Request Approval', class: 'bg-amber-light/20 text-amber-dark' },
+    not_accepted: { label: 'Not Accepted', class: 'bg-red-50 text-hazard' },
+    unknown: { label: 'Unknown', class: 'bg-gray-100 text-gray-500' },
+  };
+  const c = config[type] || config.unknown;
+  return (
+    <span className={`rounded-lg px-2 py-0.5 text-[10px] font-semibold ${c.class}`}>
+      {c.label}
+    </span>
+  );
+}
+
+// ============================================================
+// CHECKOUT FORM
+// ============================================================
+function CheckoutForm({
+  items,
+  totalItems,
+  totalValueMin,
+  totalValueMax,
+  hasHazardous,
+  onCancel,
+  onSuccess,
+}: {
+  items: BasketItem[];
+  totalItems: number;
+  totalValueMin: number;
+  totalValueMax: number;
+  hasHazardous: boolean;
+  onCancel: () => void;
+  onSuccess: () => void;
+}) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+  const [pickupSlot, setPickupSlot] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const slots = ['09:00-11:00', '11:00-13:00', '13:00-15:00', '15:00-17:00', '17:00-19:00'];
+
+  const handleSubmit = async () => {
+    if (!user) {
+      setError('You must be signed in to place an order.');
+      return;
+    }
+    if (!address.trim() || !phone.trim() || !pickupDate || !pickupSlot) {
+      setError('Please fill in all fields: address, phone, date, and time slot.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const hasSpecialRequest = items.some((i) => i.isHighValue === false && i.category.includes('Large') || false);
+
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          status: 'submitted',
+          pickup_address: address,
+          pickup_phone: phone,
+          pickup_date: pickupDate,
+          pickup_slot: pickupSlot,
+          total_items: totalItems,
+          estimated_value_min: totalValueMin,
+          estimated_value_max: totalValueMax,
+          has_special_request: hasSpecialRequest,
+          has_hazardous: hasHazardous,
+        })
+        .select()
+        .single();
+
+      if (orderError) {
+        setError(`Failed to create order: ${orderError.message}`);
+        setSubmitting(false);
+        return;
+      }
+
+      const order = orderData as Order;
+
+      const itemRows = items.map((item) => ({
+        order_id: order.id,
+        user_id: user.id,
+        category: item.category,
+        name: item.label,
+        image_url: item.photoUrl || null,
+        item_type: 'accepted' as const,
+        quantity: item.quantity,
+        grade: item.grade,
+        estimated_value_min: item.estimatedValueMin,
+        estimated_value_max: item.estimatedValueMax,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(itemRows);
+
+      if (itemsError) {
+        setError(`Order created but items failed: ${itemsError.message}`);
+        setSubmitting(false);
+        return;
+      }
+
+      showToast('Order placed successfully!', 'success');
+      onSuccess();
+    } catch (err) {
+      setError(`An unexpected error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="mt-8 animate-fade-in-up">
+      <div className="card">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-forest-500">
+              <ShoppingCart className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-bold text-forest-800">Checkout</h2>
+              <p className="text-xs text-forest-600">{totalItems} items &middot; Est. ₹{totalValueMin}–₹{totalValueMax}</p>
+            </div>
+          </div>
+          <button onClick={onCancel} className="text-xs font-medium text-forest-500 hover:text-forest-600">
+            Back to basket
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border-2 border-hazard/20 bg-red-50 p-3">
+            <AlertTriangle className="h-5 w-5 text-hazard flex-shrink-0" />
+            <p className="text-sm text-hazard">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-forest-700">Pickup Address *</label>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Full address for pickup"
+              rows={2}
+              className="w-full rounded-xl border-2 border-forest-200 bg-white px-4 py-2.5 text-sm text-forest-800 placeholder-forest-400 focus:border-forest-400 focus:outline-none"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-forest-700">Phone Number *</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="10-digit mobile number"
+                className="w-full rounded-xl border-2 border-forest-200 bg-white px-4 py-2.5 text-sm text-forest-800 placeholder-forest-400 focus:border-forest-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-forest-700">Pickup Date *</label>
+              <input
+                type="date"
+                value={pickupDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setPickupDate(e.target.value)}
+                className="w-full rounded-xl border-2 border-forest-200 bg-white px-4 py-2.5 text-sm text-forest-800 focus:border-forest-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-forest-700">Pickup Time Slot *</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {slots.map((slot) => (
+                <button
+                  key={slot}
+                  onClick={() => setPickupSlot(slot)}
+                  className={`rounded-xl border-2 px-3 py-2 text-xs font-medium transition-all ${
+                    pickupSlot === slot
+                      ? 'border-forest-500 bg-forest-50 text-forest-700'
+                      : 'border-forest-200 text-forest-600 hover:bg-forest-50/30'
+                  }`}
+                >
+                  {slot}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {hasHazardous && (
+            <div className="flex items-center gap-2 rounded-xl border-2 border-hazard/20 bg-red-50 p-3">
+              <AlertTriangle className="h-5 w-5 text-hazard flex-shrink-0" />
+              <p className="text-xs text-hazard">Your basket contains hazardous items. They will be flagged for special handling.</p>
+            </div>
+          )}
+
+          <div className="border-t border-forest-100 pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-medium text-forest-600">Total estimated value</p>
+                <p className="font-display text-xl font-bold text-forest-800">₹{totalValueMin} – ₹{totalValueMax}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-medium text-forest-600">Total items</p>
+                <p className="font-display text-xl font-bold text-forest-800">{totalItems}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !address || !phone || !pickupDate || !pickupSlot}
+              className="btn-primary w-full disabled:opacity-50"
+            >
+              {submitting ? (
+                <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Placing order...</>
+              ) : (
+                <><CheckCircle className="h-4 w-4" /> Place Order</>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

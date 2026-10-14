@@ -55,7 +55,7 @@ export interface GradeFactor {
 export interface AcceptedItem {
   id: string;
   name: string;
-  type: 'accepted' | 'special' | 'not_accepted';
+  type: 'accepted' | 'special' | 'not_accepted' | 'special_request';
   sort_order: number;
   created_at: string;
 }
@@ -155,5 +155,53 @@ export interface Handover {
   total_value: number;
   status: 'dispatched' | 'received' | 'settled';
   notes: string;
+  created_at: string;
+}
+
+export type OrderStatus = 'submitted' | 'admin_approved' | 'waiting_company_approval' | 'company_approved' | 'rejected' | 'collected';
+
+export interface Company {
+  id: string;
+  name: string;
+  area: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
+
+export interface Order {
+  id: string;
+  user_id: string;
+  status: OrderStatus;
+  pickup_address: string;
+  pickup_phone: string;
+  pickup_date: string | null;
+  pickup_slot: string;
+  city: string;
+  pincode: string;
+  total_items: number;
+  estimated_value_min: number;
+  estimated_value_max: number;
+  has_special_request: boolean;
+  has_hazardous: boolean;
+  company_id: string | null;
+  rejection_reason: string;
+  points_awarded: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string | null;
+  user_id: string;
+  category: string;
+  name: string;
+  image_url: string | null;
+  item_type: 'accepted' | 'special_request' | 'not_accepted';
+  quantity: number;
+  grade: string;
+  estimated_value_min: number;
+  estimated_value_max: number;
   created_at: string;
 }

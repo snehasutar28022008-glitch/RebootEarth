@@ -37,7 +37,7 @@ export function AdminOverview() {
           { count: activeUsers, error: e3 },
         ] = await Promise.all([
           supabase.from('pickups').select('*', { count: 'exact', head: true }).in('status', ['pending', 'confirmed', 'scheduled']),
-          supabase.from('pickups').select('id, status, total_items, created_at, city, user_id').order('created_at', { ascending: false }).limit(10),
+          supabase.from('pickups').select('id, status, total_items, created_at, city, user_id, collected_weight_kg').order('created_at', { ascending: false }).limit(10),
           supabase.from('profiles').select('*', { count: 'exact', head: true }),
         ]);
 
@@ -49,8 +49,8 @@ export function AdminOverview() {
         let totalCollectedKg = 0;
 
         if (pickupsData) {
-          totalItems = pickupsData.reduce((sum, p) => sum + (p.total_items || 0), 0);
-          const completed = pickupsData.filter((p: { status: string; collected_weight_kg?: number | null }) => p.status === 'completed');
+          totalItems = pickupsData.reduce((sum: number, p: { total_items?: number }) => sum + (p.total_items || 0), 0);
+          const completed = pickupsData.filter((p: { status: string }) => p.status === 'completed');
           totalCollectedKg = completed.reduce((sum: number, p: { collected_weight_kg?: number | null }) => sum + (p.collected_weight_kg || 0), 0);
         }
 

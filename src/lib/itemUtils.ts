@@ -108,7 +108,7 @@ export function estimateValue(
 }
 
 // Check if an accepted item name is in the accepted list
-export function isItemAccepted(name: string, acceptedItems: AcceptedItem[]): 'accepted' | 'special' | 'not_accepted' | 'unknown' {
+export function isItemAccepted(name: string, acceptedItems: AcceptedItem[]): 'accepted' | 'special' | 'not_accepted' | 'special_request' | 'unknown' {
   const found = acceptedItems.find((i) => i.name === name);
   if (found) return found.type;
   return 'unknown';

@@ -25,6 +25,7 @@ import { AdminStock } from '@/pages/admin/AdminStock';
 import { AdminHandover } from '@/pages/admin/AdminHandover';
 import { AdminUsers } from '@/pages/admin/AdminUsers';
 import { AdminZones } from '@/pages/admin/AdminZones';
+import { AdminOrders } from '@/pages/admin/AdminOrders';
 import { AddItemsPage } from '@/pages/AddItemsPage';
 
 function AppRoutes() {
@@ -67,6 +68,7 @@ function AppRoutes() {
     if (path === '/admin/handover') return <AdminHandover />;
     if (path === '/admin/users') return <AdminUsers />;
     if (path === '/admin/zones') return <AdminZones />;
+    if (path === '/admin/orders') return <AdminOrders />;
     if (path.startsWith('/admin')) return <AdminPage />;
     return <HomePage />;
   };
