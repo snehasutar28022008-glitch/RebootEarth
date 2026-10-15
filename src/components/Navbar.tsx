@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from '@/context/RouterContext';
 import { useAuth } from '@/context/AuthContext';
 import { useBasket } from '@/context/BasketContext';
-import { Recycle, Menu, X, LayoutDashboard, LogOut, User, Shield, Home, Phone, Info, HelpCircle, ListChecks, IndianRupee, ShoppingCart, Cpu, ClipboardList, Lightbulb } from 'lucide-react';
+import { Recycle, Menu, X, LayoutDashboard, LogOut, User, Shield, Home, Phone, Info, HelpCircle, ListChecks, IndianRupee, ShoppingCart, Cpu, ClipboardList, Lightbulb, GraduationCap } from 'lucide-react';
 
 export function Navbar() {
   const { path, navigate } = useRouter();
@@ -21,6 +21,7 @@ export function Navbar() {
 
   const userLinks = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Student Hub', href: '/student-hub', icon: GraduationCap },
     { label: 'Components', href: '/components', icon: Cpu },
     { label: 'My Requests', href: '/my-requests', icon: ClipboardList },
     { label: 'Mini Projects', href: '/projects', icon: Lightbulb },
@@ -216,6 +217,7 @@ export function BottomTabBar() {
   const tabs = [
     { label: 'Home', href: '/', icon: Home },
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Students', href: '/student-hub', icon: GraduationCap },
     ...(role === 'admin' ? [{ label: 'Admin', href: '/admin', icon: Shield }] : []),
     { label: 'Profile', href: '/profile', icon: User },
   ];

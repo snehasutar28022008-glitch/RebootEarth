@@ -32,6 +32,7 @@ import { AddItemsPage } from '@/pages/AddItemsPage';
 import { ComponentsPage } from '@/pages/ComponentsPage';
 import { MyRequestsPage } from '@/pages/MyRequestsPage';
 import { MiniProjectsPage } from '@/pages/MiniProjectsPage';
+import { StudentHubPage } from '@/pages/StudentHubPage';
 
 function AppRoutes() {
   const { path } = useRouter();
@@ -79,6 +80,7 @@ function AppRoutes() {
     if (path === '/components') return <ComponentsPage />;
     if (path === '/my-requests') return <MyRequestsPage />;
     if (path === '/projects') return <MiniProjectsPage />;
+    if (path === '/student-hub') return <StudentHubPage />;
     if (path.startsWith('/admin')) return <AdminPage />;
     return <HomePage />;
   };

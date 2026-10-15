@@ -16,7 +16,7 @@ export function useRouteGuard(requiredRole?: Role): {
     if (authLoading) return;
 
     const isAdminRoute = path.startsWith('/admin');
-    const isProtectedRoute = isAdminRoute || path.startsWith('/dashboard') || path.startsWith('/book') || path.startsWith('/add-items') || path.startsWith('/messages') || path.startsWith('/wallet') || path.startsWith('/profile') || path.startsWith('/pickups') || path.startsWith('/components') || path.startsWith('/my-requests') || path.startsWith('/projects');
+    const isProtectedRoute = isAdminRoute || path.startsWith('/dashboard') || path.startsWith('/book') || path.startsWith('/add-items') || path.startsWith('/messages') || path.startsWith('/wallet') || path.startsWith('/profile') || path.startsWith('/pickups') || path.startsWith('/components') || path.startsWith('/my-requests') || path.startsWith('/projects') || path.startsWith('/student-hub');
 
     if (!isProtectedRoute) {
       setAuthorized(true);

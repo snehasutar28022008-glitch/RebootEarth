@@ -3,7 +3,7 @@ import { useRouter } from '@/context/RouterContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { Fact, Setting } from '@/lib/supabase';
-import { Recycle, Truck, Award, ArrowRight, Leaf, Cpu, Zap, Globe, TrendingDown, Package, AlertTriangle } from 'lucide-react';
+import { Recycle, Truck, Award, ArrowRight, Leaf, Cpu, Zap, Globe, TrendingDown, Package, AlertTriangle, Lightbulb } from 'lucide-react';
 
 export function HomePage() {
   const { navigate } = useRouter();
@@ -280,6 +280,41 @@ export function HomePage() {
           <div className="flex items-center justify-center gap-3 rounded-2xl bg-white p-5 text-center shadow-sm">
             <Recycle className="h-5 w-5 text-forest-500 flex-shrink-0" />
             <p className="text-sm font-medium text-forest-700">{partnerText}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* For Engineering Students */}
+      <section className="bg-white py-16">
+        <div className="container-max px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-forest-50 px-4 py-2 text-sm font-medium text-forest-600">
+              <Cpu className="h-4 w-4" />
+              For Engineering Students
+            </div>
+            <h2 className="font-display text-3xl font-bold text-forest-800 sm:text-4xl mb-3">
+              For Engineering Students
+            </h2>
+            <p className="text-forest-600">Find recovered components and explore mini projects</p>
+          </div>
+
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <button
+              onClick={() => navigate('/components')}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-forest-500 px-6 py-3.5 text-sm font-bold text-white shadow-lg transition-all duration-300 hover:bg-forest-600 hover:-translate-y-0.5"
+            >
+              <Cpu className="h-5 w-5" />
+              Explore Components
+              <ArrowRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => navigate('/projects')}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-forest-200 px-6 py-3.5 text-sm font-bold text-forest-700 transition-all duration-300 hover:bg-forest-50 hover:-translate-y-0.5"
+            >
+              <Lightbulb className="h-5 w-5" />
+              Explore Mini Projects
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
