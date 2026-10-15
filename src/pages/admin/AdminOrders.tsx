@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Order, OrderItem, Company } from '@/lib/supabase';
+import type { Order, OrderItem, Company, PassportEvent, PassportStage } from '@/lib/supabase';
 import { useRouter } from '@/context/RouterContext';
 import { useToast } from '@/context/ToastContext';
 import { PageHeader, LoadingSpinner, EmptyState } from '@/components/ui';
 import {
   ClipboardList, ArrowLeft, AlertTriangle, Package, MapPin, Phone, Calendar,
   Clock, CheckCircle, XCircle, Building2, Award, Search, ChevronDown, ChevronUp,
+  Stamp, Plus,
 } from 'lucide-react';
 
 interface OrderWithDetails extends Order {
@@ -14,6 +15,8 @@ interface OrderWithDetails extends Order {
   user_name: string;
   user_email: string;
 }
+
+const PASSPORT_STAGES: PassportStage[] = ['Submitted', 'Picked Up', 'Inspected', 'Recovery Decision', 'Recycled', 'Recovered'];
 
 const STATUS_LABELS: Record<string, string> = {
   submitted: 'Submitted',
@@ -46,6 +49,9 @@ export function AdminOrders() {
   const [rejectReason, setRejectReason] = useState<Record<string, string>>({});
   const [pointsInput, setPointsInput] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [passportEvents, setPassportEvents] = useState<Record<string, PassportEvent[]>>({});
+  const [passportNote, setPassportNote] = useState<Record<string, string>>({});
+  const [passportLoading, setPassportLoading] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -80,6 +86,25 @@ export function AdminOrders() {
 
         setOrders(rows);
         setCompanies((companiesData ?? []) as Company[]);
+
+        // Fetch passport events for all orders
+        if (rows.length > 0) {
+          const orderIds = rows.map((r) => r.id);
+          const { data: eventsData } = await supabase
+            .from('passport_events')
+            .select('*')
+            .in('request_id', orderIds)
+            .order('created_at', { ascending: true });
+          const eventMap: Record<string, PassportEvent[]> = {};
+          (eventsData ?? []).forEach((e: Record<string, unknown>) => {
+            const ev = e as unknown as PassportEvent;
+            const key = ev.request_id || ev.pickup_id;
+            if (!key) return;
+            if (!eventMap[key]) eventMap[key] = [];
+            eventMap[key].push(ev);
+          });
+          setPassportEvents(eventMap);
+        }
       } catch {
         setError('Failed to load orders');
       }
@@ -151,6 +176,44 @@ export function AdminOrders() {
 
   const handleAssignCompany = (order: OrderWithDetails, companyId: string) => {
     updateOrder(order.id, { company_id: companyId || null });
+  };
+
+  const getNextStage = (orderId: string): PassportStage | null => {
+    const events = passportEvents[orderId] || [];
+    const completed = new Set(events.map((e) => e.stage));
+    for (const stage of PASSPORT_STAGES) {
+      if (!completed.has(stage)) return stage;
+    }
+    return null;
+  };
+
+  const handleAddPassportStage = async (order: OrderWithDetails) => {
+    const nextStage = getNextStage(order.id);
+    if (!nextStage) {
+      showToast('All stages are already completed', 'warning');
+      return;
+    }
+    setPassportLoading(order.id);
+    const note = (passportNote[order.id] || '').trim();
+    const { error: pe } = await supabase.from('passport_events').insert({
+      request_id: order.id,
+      stage: nextStage,
+      note,
+    });
+    setPassportLoading(null);
+    if (pe) {
+      showToast(pe.message, 'error');
+      return;
+    }
+    // Refetch events for this order
+    const { data: newEvents } = await supabase
+      .from('passport_events')
+      .select('*')
+      .eq('request_id', order.id)
+      .order('created_at', { ascending: true });
+    setPassportEvents((prev) => ({ ...prev, [order.id]: (newEvents ?? []) as PassportEvent[] }));
+    setPassportNote((prev) => { const next = { ...prev }; delete next[order.id]; return next; });
+    showToast(`Stage "${nextStage}" added`, 'success');
   };
 
   const filtered = orders.filter((o) => {
@@ -240,6 +303,9 @@ export function AdminOrders() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {order.passport_id && (
+                          <span className="rounded-lg bg-forest-800 px-2 py-0.5 text-xs font-bold text-white font-mono">{order.passport_id}</span>
+                        )}
                         <h3 className="font-display text-sm font-bold text-forest-800 truncate">{order.user_name}</h3>
                         <span className={`rounded-lg px-2 py-0.5 text-xs font-semibold ${STATUS_CLASSES[order.status] || 'bg-forest-50 text-forest-600'}`}>
                           {STATUS_LABELS[order.status] || order.status}
@@ -436,6 +502,41 @@ export function AdminOrders() {
                           <Award className="h-4 w-4" /> {order.points_awarded} points awarded
                         </div>
                       )}
+                    </div>
+
+                    {/* Update Passport */}
+                    <div className="rounded-lg border border-forest-100 bg-forest-50/30 p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Stamp className="h-4 w-4 text-forest-500" />
+                        <p className="text-xs font-semibold text-forest-700">E-Waste Passport</p>
+                        {(passportEvents[order.id] || []).map((e) => (
+                          <span key={e.id} className="rounded bg-forest-100 px-1.5 py-0.5 text-[10px] font-medium text-forest-600">{e.stage}</span>
+                        ))}
+                      </div>
+                      {(() => {
+                        const nextStage = getNextStage(order.id);
+                        if (!nextStage) {
+                          return <p className="text-xs text-forest-500">All stages completed.</p>;
+                        }
+                        return (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Optional note..."
+                              value={passportNote[order.id] || ''}
+                              onChange={(e) => setPassportNote((prev) => ({ ...prev, [order.id]: e.target.value }))}
+                              className="flex-1 min-w-32 rounded-lg border-2 border-forest-200 bg-white px-3 py-1.5 text-xs focus:border-forest-400 focus:outline-none"
+                            />
+                            <button
+                              onClick={() => handleAddPassportStage(order)}
+                              disabled={passportLoading === order.id}
+                              className="rounded-lg bg-forest-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-600 disabled:opacity-50"
+                            >
+                              <Plus className="h-3 w-3 inline" /> Add: {nextStage}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

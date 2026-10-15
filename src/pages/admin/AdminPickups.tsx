@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { supabase, type Pickup } from '@/lib/supabase';
+import { supabase, type Pickup, type PassportEvent, type PassportStage } from '@/lib/supabase';
 import { useRouter } from '@/context/RouterContext';
+import { useToast } from '@/context/ToastContext';
 import { PageHeader, LoadingSpinner, EmptyState } from '@/components/ui';
 import {
   Truck, ArrowLeft, Search, AlertTriangle, Package, MapPin, Calendar,
+  Stamp, Plus,
 } from 'lucide-react';
 
 interface PickupWithUser extends Pickup {
@@ -12,15 +14,20 @@ interface PickupWithUser extends Pickup {
 }
 
 const STATUS_OPTIONS = ['pending', 'confirmed', 'scheduled', 'collected', 'completed', 'cancelled'];
+const PASSPORT_STAGES: PassportStage[] = ['Submitted', 'Picked Up', 'Inspected', 'Recovery Decision', 'Recycled', 'Recovered'];
 
 export function AdminPickups() {
   const { navigate } = useRouter();
+  const { showToast } = useToast();
   const [pickups, setPickups] = useState<PickupWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [passportEvents, setPassportEvents] = useState<Record<string, PassportEvent[]>>({});
+  const [passportNote, setPassportNote] = useState<Record<string, string>>({});
+  const [passportLoading, setPassportLoading] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -56,12 +63,68 @@ export function AdminPickups() {
           user_email: profileMap.get(r.user_id)?.email ?? '',
         }));
         setPickups(enriched);
+
+        // Fetch passport events for all pickups
+        if (rows.length > 0) {
+          const pickupIds = rows.map((r) => r.id);
+          const { data: eventsData } = await supabase
+            .from('passport_events')
+            .select('*')
+            .in('pickup_id', pickupIds)
+            .order('created_at', { ascending: true });
+          const eventMap: Record<string, PassportEvent[]> = {};
+          (eventsData ?? []).forEach((e: Record<string, unknown>) => {
+            const ev = e as unknown as PassportEvent;
+            const key = ev.pickup_id || ev.request_id;
+            if (!key) return;
+            if (!eventMap[key]) eventMap[key] = [];
+            eventMap[key].push(ev);
+          });
+          setPassportEvents(eventMap);
+        }
       } catch {
         setError('Failed to load pickup requests');
       }
       setLoading(false);
     })();
   }, []);
+
+  const getNextStage = (pickupId: string): PassportStage | null => {
+    const events = passportEvents[pickupId] || [];
+    const completed = new Set(events.map((e) => e.stage));
+    for (const stage of PASSPORT_STAGES) {
+      if (!completed.has(stage)) return stage;
+    }
+    return null;
+  };
+
+  const handleAddPassportStage = async (pickup: PickupWithUser) => {
+    const nextStage = getNextStage(pickup.id);
+    if (!nextStage) {
+      showToast('All stages are already completed', 'warning');
+      return;
+    }
+    setPassportLoading(pickup.id);
+    const note = (passportNote[pickup.id] || '').trim();
+    const { error: pe } = await supabase.from('passport_events').insert({
+      pickup_id: pickup.id,
+      stage: nextStage,
+      note,
+    });
+    setPassportLoading(null);
+    if (pe) {
+      showToast(pe.message, 'error');
+      return;
+    }
+    const { data: newEvents } = await supabase
+      .from('passport_events')
+      .select('*')
+      .eq('pickup_id', pickup.id)
+      .order('created_at', { ascending: true });
+    setPassportEvents((prev) => ({ ...prev, [pickup.id]: (newEvents ?? []) as PassportEvent[] }));
+    setPassportNote((prev) => { const next = { ...prev }; delete next[pickup.id]; return next; });
+    showToast(`Stage "${nextStage}" added`, 'success');
+  };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     setUpdatingId(id);
@@ -150,6 +213,9 @@ export function AdminPickups() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {pickup.passport_id && (
+                      <span className="rounded-lg bg-forest-800 px-2 py-0.5 text-xs font-bold text-white font-mono">{pickup.passport_id}</span>
+                    )}
                     <h3 className="font-display text-sm font-bold text-forest-800">{pickup.user_name}</h3>
                     <span className={`rounded-lg px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(pickup.status)}`}>
                       {pickup.status.charAt(0).toUpperCase() + pickup.status.slice(1)}
@@ -187,6 +253,41 @@ export function AdminPickups() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Update Passport */}
+              <div className="mt-3 border-t border-forest-50 pt-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Stamp className="h-4 w-4 text-forest-500" />
+                  <p className="text-xs font-semibold text-forest-700">E-Waste Passport</p>
+                  {(passportEvents[pickup.id] || []).map((e) => (
+                    <span key={e.id} className="rounded bg-forest-100 px-1.5 py-0.5 text-[10px] font-medium text-forest-600">{e.stage}</span>
+                  ))}
+                </div>
+                {(() => {
+                  const nextStage = getNextStage(pickup.id);
+                  if (!nextStage) {
+                    return <p className="text-xs text-forest-500">All stages completed.</p>;
+                  }
+                  return (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Optional note..."
+                        value={passportNote[pickup.id] || ''}
+                        onChange={(e) => setPassportNote((prev) => ({ ...prev, [pickup.id]: e.target.value }))}
+                        className="flex-1 min-w-32 rounded-lg border-2 border-forest-200 bg-white px-3 py-1.5 text-xs focus:border-forest-400 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => handleAddPassportStage(pickup)}
+                        disabled={passportLoading === pickup.id}
+                        className="rounded-lg bg-forest-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-600 disabled:opacity-50"
+                      >
+                        <Plus className="h-3 w-3 inline" /> Add: {nextStage}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}

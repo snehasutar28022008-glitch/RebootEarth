@@ -2,16 +2,19 @@ import { useEffect, useState } from 'react';
 import { useRouter } from '@/context/RouterContext';
 import { useAuth } from '@/context/AuthContext';
 import { useBasket } from '@/context/BasketContext';
-import { supabase, type Order, type OrderItem, type Company } from '@/lib/supabase';
+import { supabase, type Order, type OrderItem, type Company, type PassportEvent, type PassportStage } from '@/lib/supabase';
 import { PageHeader, EmptyState, LoadingSpinner } from '@/components/ui';
 import {
   Recycle, Truck, Wallet, Award, Package, ArrowRight, Sparkles, Plus, ShoppingCart,
   Clock, CheckCircle, AlertTriangle, XCircle, Building2, Calendar, MapPin, Phone,
+  Stamp, ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 interface OrderWithItems extends Order {
   order_items: OrderItem[];
 }
+
+const PASSPORT_STAGES: PassportStage[] = ['Submitted', 'Picked Up', 'Inspected', 'Recovery Decision', 'Recycled', 'Recovered'];
 
 export function DashboardPage() {
   const { navigate } = useRouter();
@@ -20,6 +23,8 @@ export function DashboardPage() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [passportEvents, setPassportEvents] = useState<Record<string, PassportEvent[]>>({});
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -28,6 +33,25 @@ export function DashboardPage() {
         .select('*, order_items(*)')
         .order('created_at', { ascending: false });
       setOrders((ordersData ?? []) as OrderWithItems[]);
+
+      // Fetch passport events for all orders
+      if ((ordersData ?? []).length > 0) {
+        const orderIds = (ordersData ?? []).map((o: Record<string, unknown>) => (o as { id: string }).id);
+        const { data: eventsData } = await supabase
+          .from('passport_events')
+          .select('*')
+          .in('request_id', orderIds)
+          .order('created_at', { ascending: true });
+        const eventMap: Record<string, PassportEvent[]> = {};
+        (eventsData ?? []).forEach((e: Record<string, unknown>) => {
+          const ev = e as unknown as PassportEvent;
+          const key = ev.request_id || ev.pickup_id;
+          if (!key) return;
+          if (!eventMap[key]) eventMap[key] = [];
+          eventMap[key].push(ev);
+        });
+        setPassportEvents(eventMap);
+      }
 
       const { data: companiesData } = await supabase.from('companies').select('*');
       setCompanies((companiesData ?? []) as Company[]);
@@ -162,6 +186,11 @@ export function DashboardPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
+                        {order.passport_id && (
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-forest-800 px-2 py-0.5 text-xs font-bold text-white font-mono">
+                            <Stamp className="h-3 w-3" /> {order.passport_id}
+                          </span>
+                        )}
                         <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-0.5 text-xs font-semibold ${sc.class}`}>
                           <SIcon className="h-3 w-3" /> {sc.label}
                         </span>
@@ -225,6 +254,25 @@ export function DashboardPage() {
                       <p className="font-display text-sm font-bold text-forest-800">₹{order.estimated_value_min}–₹{order.estimated_value_max}</p>
                     </div>
                   </div>
+
+                  {/* Digital E-Waste Passport toggle */}
+                  {order.passport_id && (
+                    <div className="mt-3 border-t border-forest-50 pt-3">
+                      <button
+                        onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+                        className="flex w-full items-center justify-between text-left"
+                      >
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-forest-600">
+                          <Stamp className="h-3.5 w-3.5" /> Digital E-Waste Passport
+                        </span>
+                        {expandedOrderId === order.id ? <ChevronUp className="h-4 w-4 text-forest-400" /> : <ChevronDown className="h-4 w-4 text-forest-400" />}
+                      </button>
+
+                      {expandedOrderId === order.id && (
+                        <PassportTimeline events={passportEvents[order.id] || []} passportId={order.passport_id} />
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -244,6 +292,53 @@ export function DashboardPage() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function PassportTimeline({ events, passportId }: { events: PassportEvent[]; passportId: string }) {
+  const eventMap = new Map<string, PassportEvent>();
+  events.forEach((e) => eventMap.set(e.stage, e));
+
+  return (
+    <div className="mt-3 rounded-xl bg-forest-50/30 p-4">
+      <p className="mb-3 text-xs font-bold text-forest-700 font-mono">Passport ID: {passportId}</p>
+      <div className="relative">
+        {PASSPORT_STAGES.map((stage, i) => {
+          const event = eventMap.get(stage);
+          const isCompleted = !!event;
+          const isLast = i === PASSPORT_STAGES.length - 1;
+          return (
+            <div key={stage} className="flex gap-3">
+              {/* Line + dot */}
+              <div className="flex flex-col items-center">
+                <div className={`flex h-7 w-7 items-center justify-center rounded-full flex-shrink-0 ${isCompleted ? 'bg-forest-500' : 'bg-gray-200'}`}>
+                  {isCompleted ? (
+                    <CheckCircle className="h-4 w-4 text-white" />
+                  ) : (
+                    <Clock className="h-3.5 w-3.5 text-gray-400" />
+                  )}
+                </div>
+                {!isLast && (
+                  <div className={`w-0.5 flex-1 min-h-6 ${isCompleted ? 'bg-forest-300' : 'bg-gray-200'}`} />
+                )}
+              </div>
+              {/* Content */}
+              <div className={`pb-4 ${isLast ? 'pb-0' : ''}`}>
+                <p className={`text-sm font-semibold ${isCompleted ? 'text-forest-800' : 'text-gray-400'}`}>{stage}</p>
+                {isCompleted ? (
+                  <>
+                    <p className="text-xs text-forest-500 mt-0.5">{new Date(event.created_at).toLocaleString()}</p>
+                    {event.note && <p className="text-xs text-forest-600 mt-1">{event.note}</p>}
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-0.5">Pending</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

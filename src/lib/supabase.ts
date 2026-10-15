@@ -101,6 +101,7 @@ export interface Pickup {
   id: string;
   user_id: string;
   status: 'pending' | 'confirmed' | 'scheduled' | 'collected' | 'completed' | 'cancelled';
+  passport_id: string | null;
   scheduled_date: string | null;
   time_slot: string;
   address: string;
@@ -172,6 +173,7 @@ export interface Order {
   id: string;
   user_id: string;
   status: OrderStatus;
+  passport_id: string | null;
   pickup_address: string;
   pickup_phone: string;
   pickup_date: string | null;
@@ -203,6 +205,17 @@ export interface OrderItem {
   grade: string;
   estimated_value_min: number;
   estimated_value_max: number;
+  created_at: string;
+}
+
+export type PassportStage = 'Submitted' | 'Picked Up' | 'Inspected' | 'Recovery Decision' | 'Recycled' | 'Recovered';
+
+export interface PassportEvent {
+  id: string;
+  request_id: string | null;
+  pickup_id: string | null;
+  stage: PassportStage;
+  note: string;
   created_at: string;
 }
 
