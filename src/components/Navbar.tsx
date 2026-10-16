@@ -95,6 +95,17 @@ export function Navbar() {
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-forest-500 text-xs font-bold text-white">{totalItems}</span>
                     </button>
                   )}
+                  <button
+                    onClick={() => handleNav('/student-hub')}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                      ['/student-hub', '/components', '/my-requests', '/projects'].some((p) => path.startsWith(p))
+                        ? 'bg-forest-100 text-forest-800'
+                        : 'bg-forest-50 text-forest-700 hover:bg-forest-100'
+                    }`}
+                  >
+                    <GraduationCap className="h-4 w-4" />
+                    Students
+                  </button>
                   <button onClick={() => handleNav('/dashboard')} className="flex items-center gap-2 rounded-xl bg-forest-50 px-4 py-2 text-sm font-semibold text-forest-700 hover:bg-forest-100 transition-all">
                     <LayoutDashboard className="h-4 w-4" />
                     Dashboard
